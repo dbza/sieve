@@ -1,2 +1,2 @@
-# sieve
-Scrap and do first level filters
+# Sieve
+Scrap and do first level filtering
