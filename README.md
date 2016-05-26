@@ -1,2 +1,2 @@
 # Sieve
-Scrap and do first level filtering
+Scrap job postings and do automated first level filtering

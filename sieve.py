@@ -27,7 +27,17 @@ def get_parsed_dict(soup):
          }       
         listings.append(listing)
     return listings
-    
+
+def location_preference_level(state):
+    pref_0 = ['California', 'Oregon', 'Washington','Utah']
+    pref_1 = ['Texas', 'Arizona', 'Georgia']
+    if state in pref_0:
+        return 0
+    elif state in pref_1:
+        return 1
+    else:
+        return 2
+ 
 def is_company_blacklisted(companyname):
     blacklist = ['CyberCoders','Central Business Solutions',
                  'K2 Partnering Solutions','Pandera Systems',
@@ -42,18 +52,7 @@ def is_company_blacklisted(companyname):
     for badcompany in blacklist:
         if badcompany in companyname:
             return True
-    return False
-
-def location_preference_level(state):
-    pref_0 = ['California', 'Oregon', 'Washington','Utah']
-    pref_1 = ['Texas', 'Arizona', 'Georgia']
-    if state in pref_0:
-        return 0
-    elif state in pref_1:
-        return 1
-    else:
-        return 2
-    
+    return False   
 
 #evaluate results from page based on full JD and append to main list
 def evaluate_and_append(page_listings,filtered_listings):
@@ -62,10 +61,10 @@ def evaluate_and_append(page_listings,filtered_listings):
             listing["Reject_reason"]="Blacklisted company"
             listing["Reject_level"]="10"
         else:
-            if listing["Location"].find(','):
+            try:
                 location_pref = location_preference_level(listing["Location"].split(",")[1].strip())
-            else:
-                location_pref=99
+            except:
+                location_pref=99 #location parse error
             listing["Reject_level"]= location_pref
             if location_pref > 1 :
                 listing["Reject_reason"]="Location"
@@ -83,19 +82,16 @@ if __name__ == '__main__':
     result_count = instantsoup.find('div',class_="results-context").strong.string
     page_count = math.ceil(int(result_count)/ 25)
     
-    try:
-        #read and parse rest of the search result pages    
-        for i in range(1,page_count):
-            #for page numbers > 1         
-            if i > 1:
-                suffix = "&start=" + str((i-1) *25) +"&count=25&trk=jobs_jserp_pagination_"+str(i)
-                instantsoup = make_soup(BASE_URL+suffix)
-                
-            page_listings = get_parsed_dict(instantsoup)
-            filtered_listings = evaluate_and_append(page_listings,filtered_listings) 
-            sleep(5)  #no overloading
-    except:
-        print("exception occured, writing partial results")        
+    #read and parse rest of the search result pages    
+    for i in range(1,page_count):
+        #for page numbers > 1         
+        if i > 1:
+            suffix = "&start=" + str((i-1) *25) +"&count=25&trk=jobs_jserp_pagination_"+str(i)
+            instantsoup = make_soup(BASE_URL+suffix)
+            
+        page_listings = get_parsed_dict(instantsoup)
+        filtered_listings = evaluate_and_append(page_listings,filtered_listings) 
+        sleep(3)  #no overloading
         
     #Write to CSV
     with open ('data_file.csv','w')     as csvfile:
