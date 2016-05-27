@@ -1,11 +1,11 @@
-#Scrape Linkedin Job listings and do advanced filtering on JD 
-#be nice re volume
-#todo: learn more about object referencing and trim excess if any
+#Scrap Linkedin Job listings 
+#limit request frequency if you plan to use this
+#todo: learn object referencing in detail and optimize
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
 import csv
 import math
-from time import sleep
+from time import sleep,strftime
 
 BASE_URL = "https://www.linkedin.com/jobs/search?keywords=ETL+NOT+Manager+NOT+Staffing+NOT+BeyondSoft+NOT+CyberCoders+NOT+%22Central+Business%22+NOT+%22Strategic+IT%22+NOT+%22TechConnect+LLC%22+NOT+Infosys+NOT+Partners&locationId=us:0&f_TP=1"
 
@@ -13,8 +13,9 @@ def make_soup(list_page_url):
     htmltxt = urlopen(list_page_url).read()
     soup = BeautifulSoup(htmltxt,"lxml")
     return soup
-    
-def get_parsed_dict(soup):
+
+#parse html using beautifulsoup and return a list
+def parse_listings(soup):
     listings=[]
     result_list = soup.find("ul","search-results")
     for li in result_list.findAll ("li"):
@@ -38,26 +39,18 @@ def location_preference_level(state):
     else:
         return 2
  
-def is_company_blacklisted(companyname):
-    blacklist = ['CyberCoders','Central Business Solutions',
-                 'K2 Partnering Solutions','Pandera Systems',
-                 'Beyondsoft','Strategic IT Staffing','Jobspring Partners',
-                 'Cyma','Experis','Bridgepoint Education',
-                 'PennyMac Loan Services, LLC','Avanti Recruitment Solutions',
-                 'HERO.jobs','Insitu Inc.','RouteMatch Software',
-                 'AVANI Technology Solutions Inc','Intellisoft Technologies',
-                 'Staff Perm LLC','Key Business Solutions, Inc','GlobalTranz',
-                 'FILD Inc. ','ARC Government Solutions','SkillStorm',
-                 'Volt Workforce Solutions','Applied Resource Group']
+def is_company_blacklisted(companyname,blacklist):
     for badcompany in blacklist:
         if badcompany in companyname:
             return True
     return False   
 
-#evaluate results from page based on full JD and append to main list
-def evaluate_and_append(page_listings,filtered_listings):
+#evaluate results from page based on location and commpany
+def evaluate_listings(page_listings,filtered_listings):
+    with open('blacklist_cos.txt') as f:
+        blacklist = f.read().splitlines()
     for listing in page_listings:
-        if is_company_blacklisted(listing["Company"]):
+        if is_company_blacklisted(listing["Company"],blacklist):
             listing["Reject_reason"]="Blacklisted company"
             listing["Reject_level"]="10"
         else:
@@ -75,7 +68,7 @@ def evaluate_and_append(page_listings,filtered_listings):
     return filtered_listings
     
 if __name__ == '__main__':
-    filtered_listings=[]       
+    all_listings=[]       
 
     #get first page of results and read count
     instantsoup = make_soup(BASE_URL)
@@ -88,17 +81,22 @@ if __name__ == '__main__':
         if i > 1:
             suffix = "&start=" + str((i-1) *25) +"&count=25&trk=jobs_jserp_pagination_"+str(i)
             instantsoup = make_soup(BASE_URL+suffix)
-            
-        page_listings = get_parsed_dict(instantsoup)
-        filtered_listings = evaluate_and_append(page_listings,filtered_listings) 
-        sleep(3)  #no overloading
         
+        page_listings = parse_listings(instantsoup)
+        all_listings.extend(page_listings)
+        sleep(3)  #no overloading
+    
+    #evaluate and prioritize level 1        
+    filtered_listings= []
+    filtered_listings=evaluate_listings(all_listings,filtered_listings) 
+   
     #Write to CSV
-    with open ('data_file.csv','w')     as csvfile:
+    filename = 'listings_'+ strftime("%Y%m%d") +'.csv'
+    with open (filename,'w') as csvfile:
         fieldnames=['URL','imageUrl','Company','Title','Location','Reject_reason','Reject_level','JD']
         writer=csv.DictWriter(csvfile,fieldnames=fieldnames)
         writer.writeheader()
-        for singleitm in filtered_listings:
-            writer.writerow(singleitm)
+        writer.writerows(filtered_listings) 
     
-    
+    #todo: Read marked entries from csv for detailed look
+    #todo: fetch details page, filter on years, technologies
